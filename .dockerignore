@@ -1,0 +1,44 @@
+# Dependencies (will be installed fresh in container)
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Build output (will be generated in container)
+dist/
+
+# Test coverage
+coverage/
+
+# Test files (not needed in production)
+**/*.test.ts
+jest.config.*
+
+# Documentation
+*.md
+docs/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Husky hooks
+.husky/
+
+# Claude configuration
+.claude/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment files (should be passed via Docker env vars)
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
