@@ -2,7 +2,7 @@
  * Configuration management for the AMQP Logger Service.
  */
 
-import type { AppConfig, LogLevel } from '../types/index.js';
+import type { AppConfig, LogLevel, LokiConfig } from '../types/index.js';
 import { ConfigurationError } from '../errors/index.js';
 
 const VALID_LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error'];
@@ -39,6 +39,8 @@ export class Config {
       DEFAULT_PREFETCH_COUNT
     );
 
+    const loki = this.getLokiConfig(env);
+
     return {
       rabbitmqUrl,
       queueName,
@@ -46,7 +48,58 @@ export class Config {
       reconnectAttempts,
       reconnectDelayMs,
       prefetchCount,
+      loki,
     };
+  }
+
+  private getLokiConfig(
+    env: Record<string, string | undefined>
+  ): LokiConfig | undefined {
+    const host = env.LOKI_HOST?.trim();
+    if (!host) {
+      return undefined;
+    }
+
+    const username = env.LOKI_USERNAME?.trim();
+    const password = env.LOKI_PASSWORD?.trim();
+    const labelsStr = env.LOKI_LABELS?.trim();
+
+    const config: LokiConfig = { host };
+
+    if (username && password) {
+      config.basicAuth = { username, password };
+    } else if (username || password) {
+      throw new ConfigurationError(
+        'Both LOKI_USERNAME and LOKI_PASSWORD must be provided for basic auth',
+        username ? 'LOKI_PASSWORD' : 'LOKI_USERNAME'
+      );
+    }
+
+    if (labelsStr) {
+      config.labels = this.parseLabels(labelsStr);
+    }
+
+    return config;
+  }
+
+  private parseLabels(labelsStr: string): Record<string, string> {
+    const labels: Record<string, string> = {};
+    const pairs = labelsStr.split(',');
+
+    for (const pair of pairs) {
+      const [key, value] = pair.split('=').map((s) => s.trim());
+      if (key && value) {
+        labels[key] = value;
+      } else if (pair.trim()) {
+        throw new ConfigurationError(
+          `Invalid label format: "${pair}". Expected "key=value"`,
+          'LOKI_LABELS',
+          { provided: labelsStr }
+        );
+      }
+    }
+
+    return labels;
   }
 
   private getRequiredString(
@@ -127,6 +180,10 @@ export class Config {
 
   get prefetchCount(): number {
     return this.config.prefetchCount;
+  }
+
+  get loki(): LokiConfig | undefined {
+    return this.config.loki;
   }
 
   toJSON(): AppConfig {

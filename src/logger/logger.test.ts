@@ -61,20 +61,121 @@ describe('Logger', () => {
       createLogger({ level: 'info', pretty: true });
 
       expect(mockTransport).toHaveBeenCalledWith({
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'SYS:standard',
-          ignore: 'pid,hostname',
-        },
+        targets: [
+          {
+            target: 'pino-pretty',
+            options: {
+              colorize: true,
+              translateTime: 'SYS:standard',
+              ignore: 'pid,hostname',
+            },
+          },
+        ],
       });
     });
 
-    it('should not use transport when pretty is false', () => {
+    it('should not use transport when pretty is false and no loki', () => {
       mockPino.mockClear();
       createLogger({ level: 'info', pretty: false });
 
       expect(mockPino).toHaveBeenCalledWith(expect.anything(), undefined);
+    });
+
+    it('should create logger with loki transport when loki config is provided', () => {
+      mockTransport.mockClear();
+      createLogger({
+        level: 'info',
+        loki: { host: 'http://localhost:3100' },
+      });
+
+      expect(mockTransport).toHaveBeenCalledWith({
+        targets: [
+          {
+            target: 'pino-loki',
+            options: {
+              host: 'http://localhost:3100',
+              batching: true,
+            },
+          },
+        ],
+      });
+    });
+
+    it('should create logger with both pretty and loki transports', () => {
+      mockTransport.mockClear();
+      createLogger({
+        level: 'info',
+        pretty: true,
+        loki: { host: 'http://localhost:3100' },
+      });
+
+      expect(mockTransport).toHaveBeenCalledWith({
+        targets: [
+          {
+            target: 'pino-pretty',
+            options: {
+              colorize: true,
+              translateTime: 'SYS:standard',
+              ignore: 'pid,hostname',
+            },
+          },
+          {
+            target: 'pino-loki',
+            options: {
+              host: 'http://localhost:3100',
+              batching: true,
+            },
+          },
+        ],
+      });
+    });
+
+    it('should include basicAuth in loki options when provided', () => {
+      mockTransport.mockClear();
+      createLogger({
+        level: 'info',
+        loki: {
+          host: 'http://localhost:3100',
+          basicAuth: { username: 'user', password: 'pass' },
+        },
+      });
+
+      expect(mockTransport).toHaveBeenCalledWith({
+        targets: [
+          {
+            target: 'pino-loki',
+            options: {
+              host: 'http://localhost:3100',
+              batching: true,
+              basicAuth: { username: 'user', password: 'pass' },
+            },
+          },
+        ],
+      });
+    });
+
+    it('should include labels in loki options when provided', () => {
+      mockTransport.mockClear();
+      createLogger({
+        level: 'info',
+        loki: {
+          host: 'http://localhost:3100',
+          labels: { app: 'logger', env: 'test' },
+        },
+      });
+
+      expect(mockTransport).toHaveBeenCalledWith({
+        targets: [
+          {
+            target: 'pino-loki',
+            options: {
+              host: 'http://localhost:3100',
+              batching: true,
+              labels: { app: 'logger', env: 'test' },
+            },
+          },
+        ],
+      });
     });
 
     it('should configure formatters', () => {

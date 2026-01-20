@@ -208,6 +208,165 @@ describe('Config', () => {
     });
   });
 
+  describe('LOKI_HOST', () => {
+    it('should not include loki config when LOKI_HOST is not set', () => {
+      const config = new Config(validEnv);
+
+      expect(config.loki).toBeUndefined();
+    });
+
+    it('should parse loki config when LOKI_HOST is set', () => {
+      const env = { ...validEnv, LOKI_HOST: 'http://localhost:3100' };
+      const config = new Config(env);
+
+      expect(config.loki).toEqual({ host: 'http://localhost:3100' });
+    });
+
+    it('should trim whitespace from LOKI_HOST', () => {
+      const env = { ...validEnv, LOKI_HOST: '  http://localhost:3100  ' };
+      const config = new Config(env);
+
+      expect(config.loki?.host).toBe('http://localhost:3100');
+    });
+
+    it('should not include loki config when LOKI_HOST is empty', () => {
+      const env = { ...validEnv, LOKI_HOST: '' };
+      const config = new Config(env);
+
+      expect(config.loki).toBeUndefined();
+    });
+
+    it('should not include loki config when LOKI_HOST is whitespace only', () => {
+      const env = { ...validEnv, LOKI_HOST: '   ' };
+      const config = new Config(env);
+
+      expect(config.loki).toBeUndefined();
+    });
+  });
+
+  describe('LOKI_USERNAME and LOKI_PASSWORD', () => {
+    it('should include basicAuth when both username and password are provided', () => {
+      const env = {
+        ...validEnv,
+        LOKI_HOST: 'http://localhost:3100',
+        LOKI_USERNAME: 'user',
+        LOKI_PASSWORD: 'pass',
+      };
+      const config = new Config(env);
+
+      expect(config.loki?.basicAuth).toEqual({
+        username: 'user',
+        password: 'pass',
+      });
+    });
+
+    it('should throw ConfigurationError when only LOKI_USERNAME is provided', () => {
+      const env = {
+        ...validEnv,
+        LOKI_HOST: 'http://localhost:3100',
+        LOKI_USERNAME: 'user',
+      };
+
+      expect(() => new Config(env)).toThrow(ConfigurationError);
+      expect(() => new Config(env)).toThrow(
+        'Both LOKI_USERNAME and LOKI_PASSWORD must be provided for basic auth'
+      );
+    });
+
+    it('should throw ConfigurationError when only LOKI_PASSWORD is provided', () => {
+      const env = {
+        ...validEnv,
+        LOKI_HOST: 'http://localhost:3100',
+        LOKI_PASSWORD: 'pass',
+      };
+
+      expect(() => new Config(env)).toThrow(ConfigurationError);
+      expect(() => new Config(env)).toThrow(
+        'Both LOKI_USERNAME and LOKI_PASSWORD must be provided for basic auth'
+      );
+    });
+
+    it('should not include basicAuth when neither username nor password are provided', () => {
+      const env = {
+        ...validEnv,
+        LOKI_HOST: 'http://localhost:3100',
+      };
+      const config = new Config(env);
+
+      expect(config.loki?.basicAuth).toBeUndefined();
+    });
+  });
+
+  describe('LOKI_LABELS', () => {
+    it('should parse single label', () => {
+      const env = {
+        ...validEnv,
+        LOKI_HOST: 'http://localhost:3100',
+        LOKI_LABELS: 'app=logger',
+      };
+      const config = new Config(env);
+
+      expect(config.loki?.labels).toEqual({ app: 'logger' });
+    });
+
+    it('should parse multiple labels', () => {
+      const env = {
+        ...validEnv,
+        LOKI_HOST: 'http://localhost:3100',
+        LOKI_LABELS: 'app=logger,env=production,version=1.0',
+      };
+      const config = new Config(env);
+
+      expect(config.loki?.labels).toEqual({
+        app: 'logger',
+        env: 'production',
+        version: '1.0',
+      });
+    });
+
+    it('should trim whitespace from labels', () => {
+      const env = {
+        ...validEnv,
+        LOKI_HOST: 'http://localhost:3100',
+        LOKI_LABELS: ' app = logger , env = test ',
+      };
+      const config = new Config(env);
+
+      expect(config.loki?.labels).toEqual({ app: 'logger', env: 'test' });
+    });
+
+    it('should throw ConfigurationError for invalid label format', () => {
+      const env = {
+        ...validEnv,
+        LOKI_HOST: 'http://localhost:3100',
+        LOKI_LABELS: 'invalid-label',
+      };
+
+      expect(() => new Config(env)).toThrow(ConfigurationError);
+      expect(() => new Config(env)).toThrow('Invalid label format');
+    });
+
+    it('should throw ConfigurationError for label without value', () => {
+      const env = {
+        ...validEnv,
+        LOKI_HOST: 'http://localhost:3100',
+        LOKI_LABELS: 'app=',
+      };
+
+      expect(() => new Config(env)).toThrow(ConfigurationError);
+    });
+
+    it('should not include labels when LOKI_LABELS is not set', () => {
+      const env = {
+        ...validEnv,
+        LOKI_HOST: 'http://localhost:3100',
+      };
+      const config = new Config(env);
+
+      expect(config.loki?.labels).toBeUndefined();
+    });
+  });
+
   describe('ConfigurationError', () => {
     it('should include field name in error', () => {
       try {
