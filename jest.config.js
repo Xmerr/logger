@@ -21,6 +21,8 @@ const config = {
     'src/**/*.ts',
     '!src/**/*.test.ts',
     '!src/**/*.d.ts',
+    '!src/**/index.ts',
+    '!src/types/**',
   ],
   coverageThreshold: {
     global: {
