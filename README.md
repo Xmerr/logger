@@ -95,7 +95,7 @@ export QUEUE_NAME=my-queue
 
 # Build and run
 npm run build
-node dist/index.js
+node dist/cli.js
 ```
 
 ## License
