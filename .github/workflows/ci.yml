@@ -1,30 +1,11 @@
-name: PR Quality Checks
+name: Build and Deploy
 
 on:
-  pull_request:
+  push:
     branches: [main]
-    types: [opened, synchronize, reopened]
 
 jobs:
-  notify-pr-opened:
-    runs-on: ubuntu-latest
-    if: github.event.action == 'opened'
-    steps:
-      - name: Notify PR Opened
-        run: |
-          curl -X POST "${{ secrets.RABBITMQ_URL }}/publish/github/pr.opened" \
-            -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
-            -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "repository": "${{ github.repository }}",
-              "pr_number": "${{ github.event.pull_request.number }}",
-              "pr_title": "${{ github.event.pull_request.title }}",
-              "pr_url": "${{ github.event.pull_request.html_url }}",
-              "author": "${{ github.event.pull_request.user.login }}"
-            }'
-
-  test-and-coverage:
+  build-test-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -48,21 +29,41 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Upload coverage reports
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
         with:
-          name: coverage-report
-          path: ./coverage/
-          retention-days: 30
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/amqp-logger-service
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   notify-result:
     runs-on: ubuntu-latest
-    needs: [test-and-coverage]
+    needs: [build-test-deploy]
     if: always()
     steps:
       - name: Notify CI Success
-        if: needs.test-and-coverage.result == 'success'
+        if: needs.build-test-deploy.result == 'success'
         run: |
           curl -X POST "${{ secrets.RABBITMQ_URL }}/publish/github/ci.success" \
             -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
@@ -75,7 +76,7 @@ jobs:
             }'
 
       - name: Notify CI Failure
-        if: needs.test-and-coverage.result != 'success'
+        if: needs.build-test-deploy.result != 'success'
         run: |
           curl -X POST "${{ secrets.RABBITMQ_URL }}/publish/github/ci.failure" \
             -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
