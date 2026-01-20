@@ -14,14 +14,14 @@ A lightweight service that consumes messages from RabbitMQ queues and logs them 
 
 The official Docker image is available on Docker Hub:
 
-**[xmerr/amqp-logger-service](https://hub.docker.com/r/xmerr/amqp-logger-service)**
+**[xmer/amqp-logger-service](https://hub.docker.com/r/xmer/amqp-logger-service)**
 
 ## Running with Docker
 
 ```bash
 docker run -e RABBITMQ_URL=amqp://user:pass@host:5672 \
            -e QUEUE_NAME=my-queue \
-           xmerr/amqp-logger-service
+           xmer/amqp-logger-service
 ```
 
 ### Environment Variables
@@ -39,7 +39,7 @@ docker run -e RABBITMQ_URL=amqp://user:pass@host:5672 \
 ```yaml
 services:
   amqp-logger:
-    image: xmerr/amqp-logger-service
+    image: xmer/amqp-logger-service
     environment:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
       QUEUE_NAME: my-queue
