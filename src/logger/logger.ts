@@ -3,24 +3,66 @@
  */
 
 import pino from 'pino';
-import type { ILogger, LogLevel } from '../types/index.js';
+import type { ILogger, LogLevel, LokiConfig } from '../types/index.js';
 
 export interface LoggerOptions {
   level: LogLevel;
   pretty?: boolean;
+  loki?: LokiConfig;
+}
+
+interface TransportTarget {
+  target: string;
+  options: Record<string, unknown>;
+  level?: string;
+}
+
+function buildTransportTargets(options: LoggerOptions): TransportTarget[] {
+  const targets: TransportTarget[] = [];
+
+  if (options.pretty) {
+    targets.push({
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'SYS:standard',
+        ignore: 'pid,hostname',
+      },
+    });
+  }
+
+  if (options.loki) {
+    const lokiOptions: Record<string, unknown> = {
+      host: options.loki.host,
+      batching: true,
+    };
+
+    if (options.loki.basicAuth) {
+      lokiOptions.basicAuth = options.loki.basicAuth;
+    }
+
+    if (options.loki.labels) {
+      lokiOptions.labels = options.loki.labels;
+    }
+
+    targets.push({
+      target: 'pino-loki',
+      options: lokiOptions,
+    });
+  }
+
+  return targets;
 }
 
 export function createLogger(options: LoggerOptions): ILogger {
-  const transport = options.pretty
-    ? pino.transport({
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'SYS:standard',
-          ignore: 'pid,hostname',
-        },
-      })
-    : undefined;
+  const targets = buildTransportTargets(options);
+
+  const transport =
+    targets.length > 0
+      ? pino.transport({
+          targets,
+        })
+      : undefined;
 
   const pinoLogger = pino(
     {

@@ -22,6 +22,7 @@ export function createComponents(env?: Record<string, string | undefined>): Serv
   const logger = createLogger({
     level: config.logLevel,
     pretty: process.env.NODE_ENV !== 'production',
+    loki: config.loki,
   });
 
   const connectionManager = new ConnectionManager({

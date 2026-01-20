@@ -6,6 +6,15 @@ import type { Channel } from 'amqplib';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
+export interface LokiConfig {
+  host: string;
+  basicAuth?: {
+    username: string;
+    password: string;
+  };
+  labels?: Record<string, string>;
+}
+
 export interface AppConfig {
   rabbitmqUrl: string;
   queueName: string;
@@ -13,6 +22,7 @@ export interface AppConfig {
   reconnectAttempts: number;
   reconnectDelayMs: number;
   prefetchCount: number;
+  loki?: LokiConfig;
 }
 
 export interface ILogger {
