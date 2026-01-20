@@ -137,6 +137,7 @@ export class ConnectionManager implements IConnectionManager {
   }
 
   private setupConnectionHandlers(): void {
+    /* v8 ignore next 2 -- defensive guard for type safety, unreachable in normal flow */
     if (!this.connection) return;
 
     this.connection.on('error', (error: Error) => {
@@ -154,6 +155,7 @@ export class ConnectionManager implements IConnectionManager {
   }
 
   private setupChannelHandlers(): void {
+    /* v8 ignore next 2 -- defensive guard for type safety, unreachable in normal flow */
     if (!this.channel) return;
 
     this.channel.on('error', (error: Error) => {
