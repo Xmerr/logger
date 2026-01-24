@@ -23,6 +23,7 @@ export interface AppConfig {
   reconnectDelayMs: number;
   prefetchCount: number;
   loki?: LokiConfig;
+  dlq: DLQConfig;
 }
 
 export interface ILogger {
@@ -48,4 +49,34 @@ export interface IConnectionManager {
 export interface IMessageConsumer {
   start(): Promise<void>;
   stop(): Promise<void>;
+}
+
+export type EventType = 'pr.opened' | 'pr.closed' | 'pr.merged' | 'ci.workflow' | 'claude.hook' | 'unknown';
+
+export interface WorkflowEvent {
+  workflow: string;
+  repository?: string;
+  source?: string;
+  status?: string;
+  conclusion?: string;
+  [key: string]: unknown;
+}
+
+export interface TransformedMessage {
+  labels: Record<string, string>;
+  message: string;
+  timestamp: number;
+}
+
+export interface PREvent {
+  repository: string;
+  action: string;
+  source?: string;
+  [key: string]: unknown;
+}
+
+export interface DLQConfig {
+  enabled: boolean;
+  exchange: string;
+  routingKey: string;
 }

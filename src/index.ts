@@ -7,6 +7,7 @@ import { Config } from './config/index.js';
 import { createLogger } from './logger/index.js';
 import { ConnectionManager } from './connection/index.js';
 import { MessageConsumer } from './consumer/index.js';
+import { MessageTransformer } from './transformer/index.js';
 import type { ILogger, IConnectionManager, IMessageConsumer } from './types/index.js';
 
 export interface ServiceComponents {
@@ -18,6 +19,9 @@ export interface ServiceComponents {
 
 export function createComponents(env?: Record<string, string | undefined>): ServiceComponents {
   const config = new Config(env);
+
+  // Debug: Print Loki config
+  console.log('DEBUG: Loki config:', JSON.stringify(config.loki, null, 2));
 
   const logger = createLogger({
     level: config.logLevel,
@@ -32,11 +36,17 @@ export function createComponents(env?: Record<string, string | undefined>): Serv
     logger,
   });
 
+  const transformer = new MessageTransformer({
+    defaultLabels: config.loki?.labels,
+  });
+
   const consumer = new MessageConsumer({
     queueName: config.queueName,
     prefetchCount: config.prefetchCount,
     connectionManager,
     logger,
+    transformer,
+    dlq: config.dlq,
   });
 
   return { config, logger, connectionManager, consumer };

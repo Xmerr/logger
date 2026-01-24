@@ -2,7 +2,7 @@
  * Configuration management for the AMQP Logger Service.
  */
 
-import type { AppConfig, LogLevel, LokiConfig } from '../types/index.js';
+import type { AppConfig, LogLevel, LokiConfig, DLQConfig } from '../types/index.js';
 import { ConfigurationError } from '../errors/index.js';
 
 const VALID_LOG_LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error'];
@@ -11,6 +11,9 @@ const DEFAULT_LOG_LEVEL: LogLevel = 'info';
 const DEFAULT_RECONNECT_ATTEMPTS = 5;
 const DEFAULT_RECONNECT_DELAY_MS = 1000;
 const DEFAULT_PREFETCH_COUNT = 10;
+const DEFAULT_DLQ_ENABLED = true;
+const DEFAULT_DLQ_EXCHANGE = 'dlx';
+const DEFAULT_DLQ_ROUTING_KEY = 'dead-letter';
 
 export class Config {
   private readonly config: AppConfig;
@@ -40,6 +43,7 @@ export class Config {
     );
 
     const loki = this.getLokiConfig(env);
+    const dlq = this.getDLQConfig(env);
 
     return {
       rabbitmqUrl,
@@ -49,7 +53,21 @@ export class Config {
       reconnectDelayMs,
       prefetchCount,
       loki,
+      dlq,
     };
+  }
+
+  private getDLQConfig(env: Record<string, string | undefined>): DLQConfig {
+    const enabledStr = env.DLQ_ENABLED?.trim().toLowerCase();
+    const enabled =
+      enabledStr === undefined || enabledStr === ''
+        ? DEFAULT_DLQ_ENABLED
+        : enabledStr === 'true';
+
+    const exchange = env.DLQ_EXCHANGE?.trim() ?? DEFAULT_DLQ_EXCHANGE;
+    const routingKey = env.DLQ_ROUTING_KEY?.trim() ?? DEFAULT_DLQ_ROUTING_KEY;
+
+    return { enabled, exchange, routingKey };
   }
 
   private getLokiConfig(
@@ -184,6 +202,10 @@ export class Config {
 
   get loki(): LokiConfig | undefined {
     return this.config.loki;
+  }
+
+  get dlq(): DLQConfig {
+    return this.config.dlq;
   }
 
   toJSON(): AppConfig {

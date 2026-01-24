@@ -70,7 +70,8 @@ export function createLogger(options: LoggerOptions): ILogger {
       formatters: {
         level: (label) => ({ level: label }),
       },
-      timestamp: pino.stdTimeFunctions.isoTime,
+      // Use default epoch timestamp - pino-loki requires this format for Loki compatibility
+      // (ISO timestamps cause "unmarshalerDecoder" errors in Loki)
     },
     transport
   );

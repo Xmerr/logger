@@ -195,6 +195,11 @@ describe('Config', () => {
         reconnectAttempts: 3,
         reconnectDelayMs: 500,
         prefetchCount: 5,
+        dlq: {
+          enabled: true,
+          exchange: 'dlx',
+          routingKey: 'dead-letter',
+        },
       });
     });
 
@@ -393,6 +398,80 @@ describe('Config', () => {
           'error',
         ]);
       }
+    });
+  });
+
+  describe('DLQ configuration', () => {
+    it('should default DLQ_ENABLED to true', () => {
+      const config = new Config(validEnv);
+
+      expect(config.dlq.enabled).toBe(true);
+    });
+
+    it('should default DLQ_EXCHANGE to dlx', () => {
+      const config = new Config(validEnv);
+
+      expect(config.dlq.exchange).toBe('dlx');
+    });
+
+    it('should default DLQ_ROUTING_KEY to dead-letter', () => {
+      const config = new Config(validEnv);
+
+      expect(config.dlq.routingKey).toBe('dead-letter');
+    });
+
+    it('should parse DLQ_ENABLED=true', () => {
+      const env = { ...validEnv, DLQ_ENABLED: 'true' };
+      const config = new Config(env);
+
+      expect(config.dlq.enabled).toBe(true);
+    });
+
+    it('should parse DLQ_ENABLED=false', () => {
+      const env = { ...validEnv, DLQ_ENABLED: 'false' };
+      const config = new Config(env);
+
+      expect(config.dlq.enabled).toBe(false);
+    });
+
+    it('should parse DLQ_ENABLED=TRUE (case insensitive)', () => {
+      const env = { ...validEnv, DLQ_ENABLED: 'TRUE' };
+      const config = new Config(env);
+
+      expect(config.dlq.enabled).toBe(true);
+    });
+
+    it('should treat invalid DLQ_ENABLED value as false', () => {
+      const env = { ...validEnv, DLQ_ENABLED: 'invalid' };
+      const config = new Config(env);
+
+      expect(config.dlq.enabled).toBe(false);
+    });
+
+    it('should parse custom DLQ_EXCHANGE', () => {
+      const env = { ...validEnv, DLQ_EXCHANGE: 'my-dlx' };
+      const config = new Config(env);
+
+      expect(config.dlq.exchange).toBe('my-dlx');
+    });
+
+    it('should parse custom DLQ_ROUTING_KEY', () => {
+      const env = { ...validEnv, DLQ_ROUTING_KEY: 'my-dead-letter' };
+      const config = new Config(env);
+
+      expect(config.dlq.routingKey).toBe('my-dead-letter');
+    });
+
+    it('should trim whitespace from DLQ values', () => {
+      const env = {
+        ...validEnv,
+        DLQ_EXCHANGE: '  my-dlx  ',
+        DLQ_ROUTING_KEY: '  my-key  ',
+      };
+      const config = new Config(env);
+
+      expect(config.dlq.exchange).toBe('my-dlx');
+      expect(config.dlq.routingKey).toBe('my-key');
     });
   });
 });

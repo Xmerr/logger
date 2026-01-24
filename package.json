@@ -9,6 +9,7 @@
     "amqp-logger": "dist/cli.js"
   },
   "scripts": {
+    "start": "node --env-file=.env dist/cli.js",
     "build": "tsc",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
@@ -16,7 +17,8 @@
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "prepare": "husky",
     "docker:build": "docker build -t amqp-logger-service .",
-    "docker:run": "docker run --rm -e RABBITMQ_URL -e QUEUE_NAME amqp-logger-service"
+    "docker:run": "docker run --rm -e RABBITMQ_URL -e QUEUE_NAME amqp-logger-service",
+    "queue:publish": "npx tsx --env-file=.env scripts/publish-test-message.ts"
   },
   "keywords": [
     "amqp",
@@ -37,6 +39,7 @@
     "jest": "^29.7.0",
     "lint-staged": "^15.4.1",
     "ts-jest": "^29.2.5",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.21.0"
   },

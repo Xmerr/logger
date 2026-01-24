@@ -1,0 +1,25 @@
+services:
+  rabbitmq-loki-consumer:
+    build: .
+    container_name: rabbitmq-loki-consumer
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_URL=${RABBITMQ_URL}
+      - QUEUE_NAME=${QUEUE_NAME}
+      - LOKI_HOST=${LOKI_HOST}
+      - LOKI_USERNAME=${LOKI_USERNAME:-}
+      - LOKI_PASSWORD=${LOKI_PASSWORD:-}
+      - LOKI_LABELS=${LOKI_LABELS:-}
+      - DLQ_ENABLED=${DLQ_ENABLED:-true}
+      - DLQ_EXCHANGE=${DLQ_EXCHANGE:-dlx}
+      - DLQ_ROUTING_KEY=${DLQ_ROUTING_KEY:-dead-letter}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - PREFETCH_COUNT=${PREFETCH_COUNT:-10}
+      - RECONNECT_ATTEMPTS=${RECONNECT_ATTEMPTS:-5}
+      - RECONNECT_DELAY_MS=${RECONNECT_DELAY_MS:-1000}
+    networks:
+      - network
+
+networks:
+  network:
+    external: true
