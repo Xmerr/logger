@@ -70,7 +70,8 @@ jobs:
             -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "repository": "${{ github.repository }}",
+              "repository": "${{ github.event.repository.name }}",
+              "source": "github",
               "workflow": "${{ github.workflow }}",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
@@ -83,7 +84,8 @@ jobs:
             -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "repository": "${{ github.repository }}",
+              "repository": "${{ github.event.repository.name }}",
+              "source": "github",
               "workflow": "${{ github.workflow }}",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
