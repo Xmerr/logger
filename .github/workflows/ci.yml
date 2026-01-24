@@ -73,6 +73,8 @@ jobs:
               "repository": "${{ github.repository }}",
               "source": "github",
               "workflow": "${{ github.workflow }}",
+              "status": "complete",
+              "conclusion": "success",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
 
@@ -87,5 +89,7 @@ jobs:
               "repository": "${{ github.repository }}",
               "source": "github",
               "workflow": "${{ github.workflow }}",
+              "status": "complete",
+              "conclusion": "failure",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
