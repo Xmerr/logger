@@ -18,7 +18,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "action": "opened",
-              "repository": "${{ github.event.repository.name }}",
+              "repository": "${{ github.repository }}",
               "source": "github",
               "pr_number": "${{ github.event.pull_request.number }}",
               "pr_title": "${{ github.event.pull_request.title }}",
@@ -38,7 +38,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "action": "merged",
-              "repository": "${{ github.event.repository.name }}",
+              "repository": "${{ github.repository }}",
               "source": "github",
               "pr_number": "${{ github.event.pull_request.number }}",
               "pr_title": "${{ github.event.pull_request.title }}",
@@ -58,7 +58,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "action": "closed",
-              "repository": "${{ github.event.repository.name }}",
+              "repository": "${{ github.repository }}",
               "source": "github",
               "pr_number": "${{ github.event.pull_request.number }}",
               "pr_title": "${{ github.event.pull_request.title }}",
@@ -113,6 +113,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "repository": "${{ github.repository }}",
+              "source": "github",
               "workflow": "${{ github.workflow }}",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
@@ -126,6 +127,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "repository": "${{ github.repository }}",
+              "source": "github",
               "workflow": "${{ github.workflow }}",
               "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
