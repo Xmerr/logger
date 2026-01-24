@@ -20,22 +20,21 @@ interface TransportTarget {
 function buildTransportTargets(options: LoggerOptions): TransportTarget[] {
   const targets: TransportTarget[] = [];
 
-  // DEBUG: Temporarily disabled pino-pretty to isolate loki issue
-  // if (options.pretty) {
-  //   targets.push({
-  //     target: 'pino-pretty',
-  //     options: {
-  //       colorize: true,
-  //       translateTime: 'SYS:standard',
-  //       ignore: 'pid,hostname',
-  //     },
-  //   });
-  // }
+  if (options.pretty) {
+    targets.push({
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'SYS:standard',
+        ignore: 'pid,hostname',
+      },
+    });
+  }
 
   if (options.loki) {
     const lokiOptions: Record<string, unknown> = {
       host: options.loki.host,
-      batching: false,  // Disabled for debugging - set to true in production
+      batching: true,
     };
 
     if (options.loki.basicAuth) {
@@ -57,9 +56,6 @@ function buildTransportTargets(options: LoggerOptions): TransportTarget[] {
 
 export function createLogger(options: LoggerOptions): ILogger {
   const targets = buildTransportTargets(options);
-
-  // Debug: Show what targets are being created
-  console.log('DEBUG: Transport targets:', JSON.stringify(targets, null, 2));
 
   const transport =
     targets.length > 0

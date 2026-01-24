@@ -71,7 +71,11 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "repository": "${{ github.repository }}",
-              "action": "ci.success"
+              "source": "github",
+              "workflow": "${{ github.workflow }}",
+              "status": "complete",
+              "conclusion": "success",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
 
       - name: Notify CI Failure
@@ -83,5 +87,9 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "repository": "${{ github.repository }}",
-              "action": "ci.failure"
+              "source": "github",
+              "workflow": "${{ github.workflow }}",
+              "status": "complete",
+              "conclusion": "failure",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
