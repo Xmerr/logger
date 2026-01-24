@@ -18,10 +18,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "repository": "${{ github.repository }}",
-              "pr_number": "${{ github.event.pull_request.number }}",
-              "pr_title": "${{ github.event.pull_request.title }}",
-              "pr_url": "${{ github.event.pull_request.html_url }}",
-              "author": "${{ github.event.pull_request.user.login }}"
+              "action": "pr.opened"
             }'
 
   test-and-coverage:
@@ -70,8 +67,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "repository": "${{ github.repository }}",
-              "workflow": "${{ github.workflow }}",
-              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "action": "ci.success"
             }'
 
       - name: Notify CI Failure
@@ -83,6 +79,5 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "repository": "${{ github.repository }}",
-              "workflow": "${{ github.workflow }}",
-              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "action": "ci.failure"
             }'
