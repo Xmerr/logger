@@ -1,15 +1,18 @@
 /**
- * RabbitMQ message consumption with logging.
+ * RabbitMQ message consumption with logging and DLQ support.
  */
 
 import type { Channel, ConsumeMessage } from 'amqplib';
-import type { IMessageConsumer, IConnectionManager, ILogger } from '../types/index.js';
+import type { IMessageConsumer, IConnectionManager, ILogger, DLQConfig } from '../types/index.js';
+import type { MessageTransformer } from '../transformer/index.js';
 
 export interface MessageConsumerOptions {
   queueName: string;
   prefetchCount: number;
   connectionManager: IConnectionManager;
   logger: ILogger;
+  transformer: MessageTransformer;
+  dlq: DLQConfig;
 }
 
 export class MessageConsumer implements IMessageConsumer {
@@ -17,6 +20,8 @@ export class MessageConsumer implements IMessageConsumer {
   private readonly prefetchCount: number;
   private readonly connectionManager: IConnectionManager;
   private readonly logger: ILogger;
+  private readonly transformer: MessageTransformer;
+  private readonly dlq: DLQConfig;
   private consumerTag: string | null = null;
   private isRunning = false;
 
@@ -25,6 +30,8 @@ export class MessageConsumer implements IMessageConsumer {
     this.prefetchCount = options.prefetchCount;
     this.connectionManager = options.connectionManager;
     this.logger = options.logger.child({ component: 'MessageConsumer' });
+    this.transformer = options.transformer;
+    this.dlq = options.dlq;
   }
 
   async start(): Promise<void> {
@@ -35,7 +42,19 @@ export class MessageConsumer implements IMessageConsumer {
     const channel = await this.connectionManager.getChannel();
     await channel.prefetch(this.prefetchCount);
 
-    await channel.assertQueue(this.queueName, { durable: true });
+    if (this.dlq.enabled) {
+      await this.setupDLQ(channel);
+    }
+
+    const queueOptions: Record<string, unknown> = { durable: true };
+    if (this.dlq.enabled) {
+      queueOptions.arguments = {
+        'x-dead-letter-exchange': this.dlq.exchange,
+        'x-dead-letter-routing-key': this.dlq.routingKey,
+      };
+    }
+
+    await channel.assertQueue(this.queueName, queueOptions);
 
     const { consumerTag } = await channel.consume(
       this.queueName,
@@ -45,7 +64,25 @@ export class MessageConsumer implements IMessageConsumer {
 
     this.consumerTag = consumerTag;
     this.isRunning = true;
-    this.logger.info('Consumer started', { queue: this.queueName, prefetch: this.prefetchCount });
+    this.logger.info('Consumer started', {
+      queue: this.queueName,
+      prefetch: this.prefetchCount,
+      dlqEnabled: this.dlq.enabled,
+    });
+  }
+
+  private async setupDLQ(channel: Channel): Promise<void> {
+    const dlqName = `${this.queueName}.dlq`;
+
+    await channel.assertExchange(this.dlq.exchange, 'direct', { durable: true });
+    await channel.assertQueue(dlqName, { durable: true });
+    await channel.bindQueue(dlqName, this.dlq.exchange, this.dlq.routingKey);
+
+    this.logger.info('DLQ configured', {
+      exchange: this.dlq.exchange,
+      queue: dlqName,
+      routingKey: this.dlq.routingKey,
+    });
   }
 
   async stop(): Promise<void> {
@@ -73,20 +110,26 @@ export class MessageConsumer implements IMessageConsumer {
 
     try {
       const content = msg.content.toString();
-      const parsed = this.parseMessage(content);
+      const transformed = this.transformer.transform(content);
 
-      if (parsed.success) {
-        this.logger.info('Message received', parsed.data);
-      } else {
-        this.logger.warn('Failed to parse message as JSON, logging raw content', {
-          raw: content,
-          error: parsed.error,
-        });
-      }
-
+      this.logMessage(transformed.labels, content);
       channel.ack(msg);
     } catch (error) {
       this.handleProcessingError(channel, msg, error as Error);
+    }
+  }
+
+  private logMessage(labels: Record<string, string>, content: string): void {
+    const parsed = this.parseMessage(content);
+
+    if (parsed.success) {
+      this.logger.info('Message received', { ...parsed.data, _labels: labels });
+    } else {
+      this.logger.warn('Failed to parse message as JSON, logging raw content', {
+        raw: content,
+        error: parsed.error,
+        _labels: labels,
+      });
     }
   }
 

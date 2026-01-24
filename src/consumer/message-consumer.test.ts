@@ -1,12 +1,15 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import type { Channel, ConsumeMessage, Replies } from 'amqplib';
-import type { ILogger } from '../types/index.js';
+import type { ILogger, DLQConfig } from '../types/index.js';
 import { MessageConsumer } from './message-consumer.js';
+import { MessageTransformer } from '../transformer/index.js';
 
 describe('MessageConsumer', () => {
   let mockChannel: {
     prefetch: jest.Mock;
     assertQueue: jest.Mock;
+    assertExchange: jest.Mock;
+    bindQueue: jest.Mock;
     consume: jest.Mock;
     cancel: jest.Mock;
     ack: jest.Mock;
@@ -20,6 +23,8 @@ describe('MessageConsumer', () => {
     onStateChange: jest.Mock;
   };
   let mockLogger: ILogger;
+  let mockTransformer: MessageTransformer;
+  let dlqConfig: DLQConfig;
   let messageHandler: ((msg: ConsumeMessage | null) => void) | null;
 
   beforeEach(() => {
@@ -29,6 +34,8 @@ describe('MessageConsumer', () => {
     mockChannel = {
       prefetch: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
       assertQueue: jest.fn<() => Promise<Replies.AssertQueue>>().mockResolvedValue({ queue: 'test-queue', messageCount: 0, consumerCount: 0 }),
+      assertExchange: jest.fn<() => Promise<Replies.AssertExchange>>().mockResolvedValue({ exchange: 'dlx' }),
+      bindQueue: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
       consume: jest.fn<(queue: string, handler: (msg: ConsumeMessage | null) => void) => Promise<Replies.Consume>>().mockImplementation(
         (_queue: string, handler: (msg: ConsumeMessage | null) => void) => {
           messageHandler = handler;
@@ -55,6 +62,14 @@ describe('MessageConsumer', () => {
       error: jest.fn(),
       child: jest.fn().mockReturnThis(),
     };
+
+    mockTransformer = new MessageTransformer();
+
+    dlqConfig = {
+      enabled: true,
+      exchange: 'dlx',
+      routingKey: 'dead-letter',
+    };
   });
 
   describe('start', () => {
@@ -64,13 +79,14 @@ describe('MessageConsumer', () => {
         prefetchCount: 10,
         connectionManager: mockConnectionManager,
         logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: dlqConfig,
       });
 
       await consumer.start();
 
       expect(mockConnectionManager.getChannel).toHaveBeenCalled();
       expect(mockChannel.prefetch).toHaveBeenCalledWith(10);
-      expect(mockChannel.assertQueue).toHaveBeenCalledWith('test-queue', { durable: true });
       expect(mockChannel.consume).toHaveBeenCalledWith(
         'test-queue',
         expect.any(Function),
@@ -79,7 +95,68 @@ describe('MessageConsumer', () => {
       expect(mockLogger.info).toHaveBeenCalledWith('Consumer started', {
         queue: 'test-queue',
         prefetch: 10,
+        dlqEnabled: true,
       });
+    });
+
+    it('should setup DLQ when enabled', async () => {
+      const consumer = new MessageConsumer({
+        queueName: 'test-queue',
+        prefetchCount: 10,
+        connectionManager: mockConnectionManager,
+        logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: dlqConfig,
+      });
+
+      await consumer.start();
+
+      expect(mockChannel.assertExchange).toHaveBeenCalledWith('dlx', 'direct', { durable: true });
+      expect(mockChannel.assertQueue).toHaveBeenCalledWith('test-queue.dlq', { durable: true });
+      expect(mockChannel.bindQueue).toHaveBeenCalledWith('test-queue.dlq', 'dlx', 'dead-letter');
+      expect(mockLogger.info).toHaveBeenCalledWith('DLQ configured', {
+        exchange: 'dlx',
+        queue: 'test-queue.dlq',
+        routingKey: 'dead-letter',
+      });
+    });
+
+    it('should configure queue with DLX arguments when DLQ enabled', async () => {
+      const consumer = new MessageConsumer({
+        queueName: 'test-queue',
+        prefetchCount: 10,
+        connectionManager: mockConnectionManager,
+        logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: dlqConfig,
+      });
+
+      await consumer.start();
+
+      expect(mockChannel.assertQueue).toHaveBeenCalledWith('test-queue', {
+        durable: true,
+        arguments: {
+          'x-dead-letter-exchange': 'dlx',
+          'x-dead-letter-routing-key': 'dead-letter',
+        },
+      });
+    });
+
+    it('should not setup DLQ when disabled', async () => {
+      const consumer = new MessageConsumer({
+        queueName: 'test-queue',
+        prefetchCount: 10,
+        connectionManager: mockConnectionManager,
+        logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: { enabled: false, exchange: 'dlx', routingKey: 'dead-letter' },
+      });
+
+      await consumer.start();
+
+      expect(mockChannel.assertExchange).not.toHaveBeenCalled();
+      expect(mockChannel.bindQueue).not.toHaveBeenCalled();
+      expect(mockChannel.assertQueue).toHaveBeenCalledWith('test-queue', { durable: true });
     });
 
     it('should not start if already running', async () => {
@@ -88,6 +165,8 @@ describe('MessageConsumer', () => {
         prefetchCount: 10,
         connectionManager: mockConnectionManager,
         logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: dlqConfig,
       });
 
       await consumer.start();
@@ -104,6 +183,8 @@ describe('MessageConsumer', () => {
         prefetchCount: 10,
         connectionManager: mockConnectionManager,
         logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: dlqConfig,
       });
 
       await consumer.start();
@@ -119,6 +200,8 @@ describe('MessageConsumer', () => {
         prefetchCount: 10,
         connectionManager: mockConnectionManager,
         logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: dlqConfig,
       });
 
       await consumer.stop();
@@ -134,6 +217,8 @@ describe('MessageConsumer', () => {
         prefetchCount: 10,
         connectionManager: mockConnectionManager,
         logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: dlqConfig,
       });
 
       await consumer.start();
@@ -142,32 +227,41 @@ describe('MessageConsumer', () => {
   });
 
   describe('message handling', () => {
-    it('should log valid JSON messages', async () => {
+    it('should log valid JSON messages with labels', async () => {
       const consumer = new MessageConsumer({
         queueName: 'test-queue',
         prefetchCount: 10,
         connectionManager: mockConnectionManager,
         logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: dlqConfig,
       });
 
       await consumer.start();
 
-      const msg = createMessage({ level: 'info', message: 'test' });
+      const msg = createMessage({ repository: 'owner/repo', action: 'opened' });
       if (messageHandler) messageHandler(msg);
 
       expect(mockLogger.info).toHaveBeenCalledWith('Message received', {
-        level: 'info',
-        message: 'test',
+        repository: 'owner/repo',
+        action: 'opened',
+        _labels: expect.objectContaining({
+          event_type: 'pr.opened',
+          repository: 'owner/repo',
+          action: 'opened',
+        }),
       });
       expect(mockChannel.ack).toHaveBeenCalledWith(msg);
     });
 
-    it('should log warning for invalid JSON and log raw content', async () => {
+    it('should log warning for invalid JSON and include labels', async () => {
       const consumer = new MessageConsumer({
         queueName: 'test-queue',
         prefetchCount: 10,
         connectionManager: mockConnectionManager,
         logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: dlqConfig,
       });
 
       await consumer.start();
@@ -180,6 +274,7 @@ describe('MessageConsumer', () => {
         expect.objectContaining({
           raw: 'not json',
           error: expect.any(String),
+          _labels: expect.objectContaining({ event_type: 'unknown' }),
         })
       );
       expect(mockChannel.ack).toHaveBeenCalledWith(msg);
@@ -191,6 +286,8 @@ describe('MessageConsumer', () => {
         prefetchCount: 10,
         connectionManager: mockConnectionManager,
         logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: dlqConfig,
       });
 
       await consumer.start();
@@ -207,6 +304,8 @@ describe('MessageConsumer', () => {
         prefetchCount: 10,
         connectionManager: mockConnectionManager,
         logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: dlqConfig,
       });
 
       // Mock ack to throw
@@ -232,6 +331,8 @@ describe('MessageConsumer', () => {
         prefetchCount: 10,
         connectionManager: mockConnectionManager,
         logger: mockLogger,
+        transformer: mockTransformer,
+        dlq: dlqConfig,
       });
 
       mockChannel.ack.mockImplementation(() => {
